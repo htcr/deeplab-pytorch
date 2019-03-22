@@ -25,7 +25,7 @@ IMAGE:
     SIZE:
         BASE:
         TRAIN:
-        TEST: 513
+        TEST: 1024
 
 MODEL:
     NAME: DeepLabV1_ResNet101

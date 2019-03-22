@@ -20,7 +20,7 @@ import yaml
 from addict import Dict
 
 from libs.models import *
-from libs.utils import DenseCRF
+# from libs.utils import DenseCRF
 
 
 def get_device(cuda):
@@ -159,6 +159,7 @@ def single(config_path, model_path, image_path, cuda, crf):
     labelmap = inference(model, image, raw_image, postprocessor)
     labels = np.unique(labelmap)
 
+    """
     # Show result for each class
     rows = np.floor(np.sqrt(len(labels) + 1))
     cols = np.ceil((len(labels) + 1) / rows)
@@ -176,6 +177,25 @@ def single(config_path, model_path, image_path, cuda, crf):
         ax.imshow(raw_image[..., ::-1])
         ax.imshow(mask.astype(np.float32), alpha=0.5)
         ax.axis("off")
+
+    plt.tight_layout()
+    plt.show()
+    """
+
+    plt.figure(figsize=(1, 2))
+    ax = plt.subplot(1, 2, 1)
+
+    ax.set_title("Input image")
+    ax.imshow(raw_image[:, :, ::-1])
+    ax.axis("off")
+
+    label = 1
+    mask = labelmap == label
+    ax = plt.subplot(1, 2, 2)
+    ax.set_title(classes[label])
+    ax.imshow(raw_image[..., ::-1])
+    ax.imshow(mask.astype(np.float32), alpha=0.5)
+    ax.axis("off")
 
     plt.tight_layout()
     plt.show()

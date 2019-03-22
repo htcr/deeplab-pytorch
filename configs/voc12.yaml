@@ -4,7 +4,7 @@ EXP:
 
 DATASET:
     NAME: vocaug
-    ROOT: /media/kazuto1011/Extra/VOCdevkit
+    ROOT: /home/mscv1/Desktop/FRL/VOC12/VOCdevkit
     LABELS: ./data/datasets/voc12/labels.txt
     N_CLASSES: 21
     IGNORE_LABEL: 255
@@ -35,9 +35,9 @@ MODEL:
 
 SOLVER:
     BATCH_SIZE:
-        TRAIN: 5
+        TRAIN: 8
         TEST: 1
-    ITER_MAX: 20000
+    ITER_MAX: 10000
     ITER_SIZE: 2
     ITER_SAVE: 5000
     ITER_TB: 100

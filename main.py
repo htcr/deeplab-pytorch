@@ -26,7 +26,8 @@ from tqdm import tqdm
 
 from libs.datasets import get_dataset
 from libs.models import *
-from libs.utils import DenseCRF, PolynomialLR, scores
+#from libs.utils import DenseCRF, PolynomialLR, scores
+from libs.utils import PolynomialLR, scores
 
 
 def makedirs(dirs):
@@ -242,6 +243,7 @@ def train(config_path, cuda):
 
             loss += float(iter_loss)
 
+        #print(loss)
         average_loss.add(loss)
 
         # Update weights with accumulated gradients
@@ -372,10 +374,12 @@ def test(config_path, model_path, cuda):
         # Forward propagation
         logits = model(images)
 
+        """
         # Save on disk for CRF post-processing
         for image_id, logit in zip(image_ids, logits):
             filename = os.path.join(logit_dir, image_id + ".npy")
             np.save(filename, logit.cpu().numpy())
+        """
 
         # Pixel-wise labeling
         _, H, W = gt_labels.shape
