@@ -99,7 +99,7 @@ if __name__ == "__main__":
     batch_size = 100
 
     dataset = VOCAug(
-        root="/media/kazuto1011/Extra/VOCdevkit",
+        root="/home/mscv1/Desktop/FRL/VOC12/VOCdevkit",
         split="train_aug",
         ignore_label=255,
         mean_bgr=(104.008, 116.669, 122.675),

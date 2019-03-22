@@ -15,7 +15,7 @@ import torch
 from PIL import Image
 from torch.utils import data
 
-from base import _BaseDataset
+from .base import _BaseDataset
 
 import random
 
@@ -129,7 +129,7 @@ if __name__ == "__main__":
         augment=True,
         base_size=513,
         crop_size=513,
-        scales=(1.0, 1.25, 1.5),
+        scales=(1.0, 1.5, 2.0),
         flip=True,
     )
     print(dataset)

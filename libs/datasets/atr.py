@@ -16,7 +16,7 @@ import torch
 from PIL import Image
 from torch.utils import data
 
-from base import _BaseDataset
+from .base import _BaseDataset
 
 import random
 

@@ -115,19 +115,24 @@ def train(config_path, cuda):
     device = get_device(cuda)
     torch.backends.cudnn.benchmark = True
 
+    datasets = list()
     # Dataset
-    dataset = get_dataset(CONFIG.DATASET.NAME)(
-        root=CONFIG.DATASET.ROOT,
-        split=CONFIG.DATASET.SPLIT.TRAIN,
-        ignore_label=CONFIG.DATASET.IGNORE_LABEL,
-        mean_bgr=(CONFIG.IMAGE.MEAN.B, CONFIG.IMAGE.MEAN.G, CONFIG.IMAGE.MEAN.R),
-        augment=True,
-        base_size=CONFIG.IMAGE.SIZE.BASE,
-        crop_size=CONFIG.IMAGE.SIZE.TRAIN,
-        scales=CONFIG.DATASET.SCALES,
-        flip=True,
-    )
-    print(dataset)
+    for DATASET_CONFIG in CONFIG.TRAIN_DATASETS:
+        dataset = get_dataset(DATASET_CONFIG.NAME)(
+            root=DATASET_CONFIG.ROOT,
+            split=DATASET_CONFIG.SPLIT,
+            ignore_label=DATASET_CONFIG.IGNORE_LABEL,
+            mean_bgr=(CONFIG.IMAGE.MEAN.B, CONFIG.IMAGE.MEAN.G, CONFIG.IMAGE.MEAN.R),
+            augment=True,
+            base_size=CONFIG.IMAGE.SIZE.BASE,
+            crop_size=CONFIG.IMAGE.SIZE.TRAIN,
+            scales=DATASET_CONFIG.SCALES,
+            flip=True,
+        )
+        print(dataset)
+        datasets.append(dataset)
+
+    dataset = torch.utils.data.dataset.ConcatDataset(datasets)
 
     # DataLoader
     loader = torch.utils.data.DataLoader(
@@ -145,7 +150,7 @@ def train(config_path, cuda):
     ), 'Currently support only "DeepLabV2_ResNet101_MSC"'
 
     # Model setup
-    model = eval(CONFIG.MODEL.NAME)(n_classes=CONFIG.DATASET.N_CLASSES)
+    model = eval(CONFIG.MODEL.NAME)(n_classes=CONFIG.MODEL.N_CLASSES)
     state_dict = torch.load(CONFIG.MODEL.INIT_MODEL)
     print("    Init:", CONFIG.MODEL.INIT_MODEL)
     for m in model.base.state_dict().keys():
@@ -156,7 +161,7 @@ def train(config_path, cuda):
     model.to(device)
 
     # Loss definition
-    criterion = nn.CrossEntropyLoss(ignore_index=CONFIG.DATASET.IGNORE_LABEL)
+    criterion = nn.CrossEntropyLoss(ignore_index=CONFIG.SOLVER.IGNORE_LABEL)
     criterion.to(device)
 
     # Optimizer
@@ -200,7 +205,7 @@ def train(config_path, cuda):
         "models",
         CONFIG.EXP.ID,
         CONFIG.MODEL.NAME.lower(),
-        CONFIG.DATASET.SPLIT.TRAIN,
+        "all_human",
     )
     makedirs(checkpoint_dir)
     print("Checkpoint dst:", checkpoint_dir)
@@ -379,6 +384,7 @@ def test(config_path, model_path, cuda):
         for image_id, logit in zip(image_ids, logits):
             filename = os.path.join(logit_dir, image_id + ".npy")
             np.save(filename, logit.cpu().numpy())
+        """
 
         # Pixel-wise labeling
         _, H, W = gt_labels.shape
