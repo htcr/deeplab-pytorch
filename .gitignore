@@ -114,3 +114,6 @@ _*
 *_v3plus.py
 *.json
 *.zip
+*.png
+docs*
+data/logs/*
