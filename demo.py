@@ -20,7 +20,7 @@ import yaml
 from addict import Dict
 
 from libs.models import *
-# from libs.utils import DenseCRF
+from libs.utils import DenseCRF
 
 
 def get_device(cuda):

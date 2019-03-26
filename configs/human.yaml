@@ -2,6 +2,10 @@ EXP:
     ID: human
     OUTPUT_DIR: data
 
+DATASET:
+    LABELS: ./data/datasets/human/labels.txt
+    N_CLASSES: 2
+
 TRAIN_DATASETS:
       - NAME: atr
         ROOT: /home/mscv1/Desktop/FRL/human_parsing_datasets/ATR/humanparsing
@@ -39,7 +43,7 @@ IMAGE:
     SIZE:
         BASE: 513
         TRAIN: 321
-        TEST: 513
+        TEST: 2048
 
 MODEL:
     NAME: DeepLabV2_ResNet101_MSC
