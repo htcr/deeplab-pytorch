@@ -54,7 +54,7 @@ class ATR(_BaseDataset):
 
     def _augmentation(self, image, label):
         # Random Grayscale
-        if random.random() < 0.5:
+        if self.gray_aug and random.random() < 0.5:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)[:, :, np.newaxis]
             image = np.repeat(image, 3, axis=2)
         

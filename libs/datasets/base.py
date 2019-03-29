@@ -30,6 +30,8 @@ class _BaseDataset(data.Dataset):
         crop_size=321,
         scales=(1.0),
         flip=True,
+        get_raw_item=False,
+        gray_aug=True
     ):
         self.root = root
         self.split = split
@@ -40,6 +42,10 @@ class _BaseDataset(data.Dataset):
         self.crop_size = crop_size
         self.scales = scales
         self.flip = flip
+
+        self.get_raw_item = get_raw_item
+        self.gray_aug = gray_aug
+
         self.files = []
         self._set_files()
 
@@ -106,11 +112,15 @@ class _BaseDataset(data.Dataset):
         image_id, image, label = self._load_data(index)
         if self.augment:
             image, label = self._augmentation(image, label)
-        # Mean subtraction
-        image -= self.mean_bgr
-        # HWC -> CHW
-        image = image.transpose(2, 0, 1)
-        return image_id, image.astype(np.float32), label.astype(np.int64)
+        
+        if not self.get_raw_item:
+            # Mean subtraction
+            image = image.astype(np.float32)
+            image -= self.mean_bgr
+            # HWC -> CHW
+            image = image.transpose(2, 0, 1)
+        
+        return image_id, image, label.astype(np.int64)
 
     def __len__(self):
         return len(self.files)
