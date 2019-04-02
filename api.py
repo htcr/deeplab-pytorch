@@ -105,7 +105,7 @@ def inference_mask(model, image, bk, raw_image=None, postprocessor=None):
 
 
 class DeepLabV2JointBKSMasker(object):
-    def __init__(self, crf=True):
+    def __init__(self, crf=True, device_id=0):
         cur_dir = osp.dirname(osp.realpath(__file__))
         
         config_path = osp.join(
@@ -117,7 +117,7 @@ class DeepLabV2JointBKSMasker(object):
             'data/models/jointbks2/deeplabv2_resnet101_msc/joint_bks/checkpoint_4000.pth'
         )
         
-        device = torch.device('cuda')
+        device = torch.device('cuda:{}'.format(device_id))
         CONFIG = Dict(yaml.load(open(config_path, 'r')))
 
         torch.set_grad_enabled(False)
