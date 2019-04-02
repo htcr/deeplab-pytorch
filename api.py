@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 from .libs.models import *
 from libs.models.deeplabv2_joint_bks import DeepLabV2JointBKS
-from .libs.utils import DenseCRF
+# from .libs.utils import DenseCRF
 
 from demo import preprocessing, inference
 
