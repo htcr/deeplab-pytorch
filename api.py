@@ -117,6 +117,7 @@ class DeepLabV2JointBKSMasker(object):
             'data/models/jointbks2/deeplabv2_resnet101_msc/joint_bks/checkpoint_4000.pth'
         )
         
+        print(device_id)
         device = torch.device('cuda:{}'.format(device_id))
         CONFIG = Dict(yaml.load(open(config_path, 'r')))
 
