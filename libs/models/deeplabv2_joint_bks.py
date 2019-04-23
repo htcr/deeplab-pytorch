@@ -142,6 +142,133 @@ class _UPSAMPLE_CASCADE(nn.Module):
         return [mask4, mask2, mask1]
 
 
+class GuidedUpsampleUnit(nn.Module):
+    def __init__(self, embed_size):
+        super(GuidedUpsampleUnit, self).__init__()
+        self.embed_size = embed_size
+        self.conv1 = nn.Conv2d(self.embed_size+7, self.embed_size, kernel_size=1)
+        self.conv2 = nn.Conv2d(self.embed_size, self.embed_size, kernel_size=5, padding=2)
+        self.conv3 = nn.Conv2d(self.embed_size, self.embed_size, kernel_size=1)
+        self.mask_pred = nn.Conv2d(self.embed_size, 1, kernel_size=1)
+
+    def forward(self, fg, bg, mask, feat):
+        # fg, bg shall be normalized
+        # feat shall be transformed to embed_size
+        mask_2x_raw = F.upsample(mask, scale_factor=2.0, mode='bilinear')
+        _, _, h2, w2 = mask_2x_raw.shape
+        feat_2x_raw = F.interpolate(feat, (h2, w2), mode='bilinear')
+        fg_2x = F.interpolate(fg, (h2, w2), mode='bilinear')
+        bg_2x = F.interpolate(bg, (h2, w2), mode='bilinear')
+
+        x = torch.cat((mask_2x_raw, fg_2x, bg_2x, feat_2x_raw), dim=1)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        feat_2x = F.relu(self.conv3(x))
+        
+        mask_2x = F.sigmoid(self.mask_pred(feat_2x))
+
+        return mask_2x, feat_2x
+
+
+class GuidedUpsampleUnitPSP(nn.Module):
+    def __init__(self, embed_size):
+        super(GuidedUpsampleUnitPSP, self).__init__()
+        self.embed_size = embed_size
+        self.conv1 = nn.Conv2d(self.embed_size+7, self.embed_size, kernel_size=1)
+        pyramid_pool_sizes = (1, 2, 4, 8)
+        self.stages = nn.ModuleList([self._make_stage(k) for k in pyramid_pool_sizes])
+        # self.conv2 = nn.Conv2d(self.embed_size, self.embed_size, kernel_size=5, padding=2)
+        self.conv3 = nn.Conv2d(self.embed_size * len(pyramid_pool_sizes), self.embed_size, kernel_size=1)
+        self.mask_pred = nn.Conv2d(self.embed_size, 1, kernel_size=1)
+
+    def _make_stage(self, pool_kernel_size):
+        pool = nn.AvgPool2d(kernel_size=pool_kernel_size)
+        trans = nn.Conv2d(self.embed_size, self.embed_size, kernel_size=5, padding=2)
+        return nn.Sequential(pool, trans)
+
+    def forward(self, fg, bg, mask, feat):
+        # fg, bg shall be normalized
+        # feat shall be transformed to embed_size
+        mask_2x_raw = F.upsample(mask, scale_factor=2.0, mode='bilinear')
+        _, _, h2, w2 = mask_2x_raw.shape
+        feat_2x_raw = F.interpolate(feat, (h2, w2), mode='bilinear')
+        fg_2x = F.interpolate(fg, (h2, w2), mode='bilinear')
+        bg_2x = F.interpolate(bg, (h2, w2), mode='bilinear')
+
+        x = torch.cat((mask_2x_raw, fg_2x, bg_2x, feat_2x_raw), dim=1)
+        x = F.relu(self.conv1(x))
+        
+        pyramid_feats = [F.interpolate(stage(x), (h2, w2), mode='bilinear') for stage in self.stages]
+        feat_2x = F.relu(self.conv3(torch.cat(pyramid_feats, dim=1)))
+        
+        mask_2x = F.sigmoid(self.mask_pred(feat_2x))
+
+        return mask_2x, feat_2x
+
+
+
+class GuidedUpsampleUnitDiff(nn.Module):
+    def __init__(self, embed_size):
+        super(GuidedUpsampleUnitDiff, self).__init__()
+        self.embed_size = embed_size
+        self.conv1 = nn.Conv2d(self.embed_size+8, self.embed_size, kernel_size=1)
+        self.conv2 = nn.Conv2d(self.embed_size, self.embed_size, kernel_size=5, padding=2)
+        self.conv3 = nn.Conv2d(self.embed_size, self.embed_size, kernel_size=1)
+        self.mask_pred = nn.Conv2d(self.embed_size, 1, kernel_size=1)
+
+    def forward(self, fg, bg, mask, feat):
+        # fg, bg shall be normalized
+        # feat shall be transformed to embed_size
+        mask_2x_raw = F.upsample(mask, scale_factor=2.0, mode='bilinear')
+        _, _, h2, w2 = mask_2x_raw.shape
+        feat_2x_raw = F.interpolate(feat, (h2, w2), mode='bilinear')
+        fg_2x = F.interpolate(fg, (h2, w2), mode='bilinear')
+        bg_2x = F.interpolate(bg, (h2, w2), mode='bilinear')
+
+        diff_2x = torch.sum((fg_2x - bg_2x)**2, dim=1, keepdim=True)**0.5
+
+        x = torch.cat((mask_2x_raw, fg_2x, bg_2x, diff_2x, feat_2x_raw), dim=1)
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        feat_2x = F.relu(self.conv3(x))
+        
+        mask_2x = F.sigmoid(self.mask_pred(feat_2x))
+
+        return mask_2x, feat_2x
+        
+        
+class CascadedUpsampler(nn.Module):
+    def __init__(self, input_feature_size, embed_size):
+        super(CascadedUpsampler, self).__init__()
+        self.input_feature_size = input_feature_size
+        self.embed_size = embed_size
+        
+        self.input_feat_trans = nn.Conv2d(self.input_feature_size, self.embed_size, kernel_size=3, padding=1)
+        
+        # self.upsample1 = GuidedUpsampleUnitPSP(self.embed_size)
+        # self.upsample2 = GuidedUpsampleUnitPSP(self.embed_size)
+        # self.upsample3 = GuidedUpsampleUnitPSP(self.embed_size)
+
+        self.upsample1 = GuidedUpsampleUnit(self.embed_size)
+        self.upsample2 = GuidedUpsampleUnit(self.embed_size)
+        self.upsample3 = GuidedUpsampleUnit(self.embed_size)
+        
+        # self.upsample1 = GuidedUpsampleUnitDiff(self.embed_size)
+        # self.upsample2 = GuidedUpsampleUnitDiff(self.embed_size)
+        # self.upsample3 = GuidedUpsampleUnitDiff(self.embed_size)
+        
+    def forward(self, fg, bg, init_mask, init_feat):
+        fg = fg / 128.0
+        bg = bg / 128.0
+        
+        init_feat = F.relu(self.input_feat_trans(init_feat))
+        mask_2x, feat_2x = self.upsample1(fg, bg, init_mask, init_feat)
+        mask_4x, feat_4x = self.upsample1(fg, bg, mask_2x, feat_2x)
+        mask_8x, feat_8x = self.upsample1(fg, bg, mask_4x, feat_4x)
+
+        return [mask_2x, mask_4x, mask_8x]     
+        
+
 class DeepLabV2JointBKS(nn.Module):
     """
     DeepLab v2: Dilated ResNet + ASPP
@@ -194,8 +321,58 @@ class DeepLabV2JointBKS(nn.Module):
         return logits, cascade_masks
 
 
+class DeepLabV2JointBKSV2(nn.Module):
+    """
+    DeepLab v2: Dilated ResNet + ASPP
+    Output stride is fixed at 8
+    """
+
+    def __init__(self, n_classes, n_blocks, atrous_rates):
+        super(DeepLabV2JointBKSV2, self).__init__()
+        self.layer1 = _Stem()
+        self.layer2 = _ResLayer(n_blocks[0], 64, 64, 256, 1, 1)
+        self.layer3 = _ResLayer(n_blocks[1], 256, 128, 512, 2, 1)
+        self.layer4 = _ResLayer(n_blocks[2], 512, 256, 1024, 1, 2)
+        self.layer5 = _ResLayer(n_blocks[3], 1024, 512, 2048, 1, 4)
+
+        self.aspp = _ASPP(2048, n_classes, atrous_rates)
+
+        self.upsample = CascadedUpsampler(2048, 32)
+
+    def freeze_bn(self):
+        for m in self.modules():
+            if isinstance(m, _ConvBnReLU.BATCH_NORM):
+                m.eval()
+
+    def forward(self, fgs, bgs):
+
+        _, _, inH, inW = fgs.shape
+
+        x = torch.cat((fgs, bgs), dim=1)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        feature = self.layer5(x)
+        
+        logits = self.aspp(feature)
+
+        probs = F.softmax(logits, dim=1)
+        human_probs = probs[:, 1:, :, :]
+
+        # mask8 = F.sigmoid(human_probs)
+        mask8 = human_probs
+        cascade_masks = self.upsample(fgs, bgs, mask8.detach(), feature)
+
+        # try to fix misalignment
+        logits_out = F.interpolate(logits, (inH, inW))
+        cascade_masks_out = [F.interpolate(mask, (inH, inW)) for mask in cascade_masks]
+
+        return logits_out, cascade_masks_out
+
+
 def test():
-    model = DeepLabV2JointBKS(
+    model = DeepLabV2JointBKSV2(
         n_classes=2, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24]
     )
     model.eval()
@@ -205,6 +382,7 @@ def test():
     print(model)
     print("input:", image.shape)
 
-    logits, mask = model(image, bg)
+    logits, masks = model(image, bg)
     print("logits:", logits.shape)
-    print("mask:", mask.shape)
+    for mask in masks:
+        print("mask:", mask.shape)

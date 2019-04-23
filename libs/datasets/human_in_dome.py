@@ -18,6 +18,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataset import ConcatDataset
 import random
 import torchvision
+from cv2.ximgproc import guidedFilter
 
 from .voc import VOC, VOCAug
 from .cocostuff import CocoStuff10k, CocoStuff164k
@@ -81,10 +82,16 @@ class HumanInDome(Dataset):
         # Synthetic image ratio
         self.syn_ratio = float(CONFIG.SYN_RATIO)
 
+        self.enlarge_kernel = np.ones((60, 60), np.uint8)
+
     def __getitem__(self, index):
         image_id, image, label = self.human_dataset[index]
         crop_size = image.shape[0]
-        
+
+        label = np.where(label == 1, 1, 0).astype(np.uint8)
+
+        enlarged_label = cv2.dilate(label, self.enlarge_kernel, iterations=1)
+
         # decide use real or syns image
         toss = random.random()
         if toss > self.syn_ratio:
@@ -98,7 +105,8 @@ class HumanInDome(Dataset):
             
             fake_bg = np.zeros(image.shape, dtype=np.float32)
             
-            return image_id, image, image, fake_bg, label, True
+
+            return image_id, image, image, fake_bg, label, True #, enlarged_label
         else:
             # read a bg pair
             picked_bg = self.bg_list[random.randint(0, len(self.bg_list))]
@@ -109,6 +117,7 @@ class HumanInDome(Dataset):
             
             bh, bw = real_bg.shape[:2]
 
+            # color_image = image.copy()
             is_gray = 'gray' in picked_bg
             if is_gray:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)[:, :, np.newaxis]
@@ -131,7 +140,16 @@ class HumanInDome(Dataset):
             syn_bg = syn_bg[start_h:end_h, start_w:end_w]
 
             # composite
-            mask = np.where(label == 1, 1, 0)
+            
+            """
+            # guided Filter
+            mask = np.where(label == 1, 255, 0).astype(np.uint8) #.reshape(image.shape[0], image.shape[1], 1)
+            guidedFilter(guide=color_image, src=mask, radius=10, eps=1e-8, dst=mask)
+            mask = mask.astype(np.float32) / 255.0
+            """
+
+            mask = np.where(label == 1, 1, 0).astype(np.uint8)
+
             masked_fg = image * mask.reshape(image.shape[0], image.shape[1], 1)
             masked_bg = syn_bg * (1 - mask.reshape(image.shape[0], image.shape[1], 1))
             comp_image = masked_fg + masked_bg
@@ -149,7 +167,7 @@ class HumanInDome(Dataset):
             comp_image = img_transform(comp_image, self.mean_bgr)
             real_bg = img_transform(real_bg, self.mean_bgr)
             
-            return image_id, image, comp_image, real_bg, label, False
+            return image_id, image, comp_image, real_bg, label, False #, enlarged_label
 
     def __len__(self):
         return len(self.human_dataset)
@@ -174,9 +192,10 @@ def test():
 
     loader = DataLoader(dataset, batch_size=batch_size)
 
-    for i, (image_ids, true_fgs, images, bgs, labels, is_real_flags) in tqdm(
+    for i, (image_ids, true_fgs, images, bgs, labels, is_real_flags, enlarged_labels) in tqdm(
         enumerate(loader), total=np.ceil(len(dataset) / batch_size), leave=False
     ):
+        labels = enlarged_labels
         print(image_ids)
         print(is_real_flags)
         if i == 0:
@@ -192,7 +211,7 @@ def test():
             labels = labels[:, np.newaxis, ...]
             label = make_grid(labels, pad_value=255, **kwargs).numpy()
             label_ = np.transpose(label, (1, 2, 0))[..., 0].astype(np.float32)
-            label = cm.jet_r(label_ / 21.0) * 255
+            label = cm.jet_r(label_ / 1.0) * 255
             mask = np.zeros(label.shape[:2])
             label[..., 3][(label_ == 255)] = 0
             label = label.astype(np.uint8)

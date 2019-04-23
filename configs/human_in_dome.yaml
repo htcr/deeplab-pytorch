@@ -1,5 +1,5 @@
 EXP:
-    ID: jointbks2
+    ID: jointbksv2
     OUTPUT_DIR: data
 
 DATASET:
@@ -20,7 +20,7 @@ TRAIN_DATASETS:
         LABELS: ./data/datasets/human/labels.txt
         N_CLASSES: 2
         IGNORE_LABEL: 255
-        SCALES: [0.6, 0.8, 1.0]
+        SCALES: [1.0, 1.5, 2.0]
         SPLIT: trainval
       
       - NAME: cihp
@@ -36,7 +36,7 @@ SYN_RATIO: 0.5
 GET_RAW_ITEM: true
 GRAY_AUG: false
 BG_SCALES: [0.5, 0.75, 1.0]
-BRIGHTNESS_RANGE: [0.5, 1.2]
+BRIGHTNESS_RANGE: [0.2, 1.2]
 VIS_ITER: 1000
 
 DATALOADER:
@@ -50,7 +50,7 @@ IMAGE:
     SIZE:
         BASE: 513
         TRAIN: 321
-        TEST: 2048
+        TEST: 1024
 
 MODEL:
     NAME: DeepLabV2_ResNet101_MSC
