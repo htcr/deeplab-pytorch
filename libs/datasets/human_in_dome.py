@@ -70,6 +70,7 @@ class HumanInDome(Dataset):
 
         self.mean_bgr = np.array((CONFIG.IMAGE.MEAN.B, CONFIG.IMAGE.MEAN.G, CONFIG.IMAGE.MEAN.R))
         self.human_dataset = ConcatDataset(human_datasets)
+        self.all_gray = CONFIG.TRAIN_ALL_GRAY
 
         # Build bg dataset
         bg_dataset_root = CONFIG.BG_DATASET_ROOT
@@ -90,13 +91,14 @@ class HumanInDome(Dataset):
 
         label = np.where(label == 1, 1, 0).astype(np.uint8)
 
-        enlarged_label = cv2.dilate(label, self.enlarge_kernel, iterations=1)
+        # enlarged_label = cv2.dilate(label, self.enlarge_kernel, iterations=1)
 
         # decide use real or syns image
         toss = random.random()
         if toss > self.syn_ratio:
             # just regular segmentation
             # random grayscale
+            gray_ratio = 0.5 if not self.all_gray else 1.0
             if random.random() < 0.5:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)[:, :, np.newaxis]
                 image = np.repeat(image, 3, axis=2)
@@ -119,9 +121,15 @@ class HumanInDome(Dataset):
 
             # color_image = image.copy()
             is_gray = 'gray' in picked_bg
-            if is_gray:
+            if is_gray or self.all_gray:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)[:, :, np.newaxis]
                 image = np.repeat(image, 3, axis=2)
+            if self.all_gray:
+                real_bg = cv2.cvtColor(real_bg, cv2.COLOR_BGR2GRAY)
+                real_bg = cv2.cvtColor(real_bg, cv2.COLOR_GRAY2BGR)
+                syn_bg = cv2.cvtColor(syn_bg, cv2.COLOR_BGR2GRAY)
+                syn_bg = cv2.cvtColor(syn_bg, cv2.COLOR_GRAY2BGR)
+                
 
             # augment bg
             

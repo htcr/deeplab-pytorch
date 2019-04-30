@@ -96,6 +96,8 @@ class HumanAndStuffInDome(Dataset):
         
         self.enlarge_kernel = np.ones((60, 60), dtype=np.uint8)
 
+        self.all_gray = CONFIG.TRAIN_ALL_GRAY
+
     def __getitem__(self, index):
         crop_size = self.crop_size
         toss = random.random()

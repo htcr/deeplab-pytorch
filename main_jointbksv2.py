@@ -34,6 +34,8 @@ from libs.datasets.human_in_dome import HumanInDome
 import torchvision
 from torchvision.utils import make_grid
 
+from evaluate import DomeSegmentationEval
+
 def makedirs(dirs):
     if not os.path.exists(dirs):
         os.makedirs(dirs)
@@ -120,6 +122,9 @@ def train(config_path, cuda):
     torch.backends.cudnn.benchmark = True
 
     dataset = HumanInDome(CONFIG)
+    
+    # evaluator
+    evaluator = DomeSegmentationEval(CONFIG, all_gray=CONFIG.TRAIN_ALL_GRAY)
 
     # DataLoader
     loader = torch.utils.data.DataLoader(
@@ -187,8 +192,7 @@ def train(config_path, cuda):
         power=CONFIG.SOLVER.POLY_POWER,
     )
 
-    # variant_name = "jointbksv2_augall_enlarge2"
-    variant_name = "jointbksv2_baseline"
+    variant_name = CONFIG.EXP.VARIANT_NAME
 
     # Setup loss logger
     writer = SummaryWriter(os.path.join(CONFIG.EXP.OUTPUT_DIR, "logs", CONFIG.EXP.ID, variant_name))
@@ -339,6 +343,8 @@ def train(config_path, cuda):
                 writer.add_image('mask_{}'.format(i), pred_masks[i, 0, :, :], iteration)
             """
 
+        
+
         #print(loss)
         average_loss.add(iter_loss.item())
         average_mat_loss.add(mat_loss.item())
@@ -378,7 +384,17 @@ def train(config_path, cuda):
                         )
             """
 
-        
+        if iteration % CONFIG.VAL_ITER == 0:
+            iou, eval_result_list = evaluator.eval(model)
+            model.train()
+            model.module.freeze_bn()
+            # writer.add_scalar("val_precision", avg_precision, iteration)
+            # writer.add_scalar("val_recall", avg_recall, iteration)
+            writer.add_scalar("val_iou", iou, iteration)
+            total_fp = np.sum([item[2] for item in eval_result_list])
+            total_fn = np.sum([item[3] for item in eval_result_list])
+            writer.add_scalar("val_fp", total_fp, iteration)
+            writer.add_scalar("val_fn", total_fn, iteration)           
 
         # Save a model
         if iteration % CONFIG.SOLVER.ITER_SAVE == 0:

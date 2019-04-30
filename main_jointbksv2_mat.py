@@ -33,6 +33,8 @@ from libs.datasets.human_and_stuff_in_dome import HumanAndStuffInDome
 import torchvision
 from torchvision.utils import make_grid
 
+from evaluate import DomeSegmentationEval
+
 def makedirs(dirs):
     if not os.path.exists(dirs):
         os.makedirs(dirs)
@@ -121,6 +123,9 @@ def train(config_path, cuda):
 
     dataset = HumanAndStuffInDome(CONFIG)
 
+    # evaluator
+    evaluator = DomeSegmentationEval(CONFIG, all_gray=CONFIG.TRAIN_ALL_GRAY)
+
     # DataLoader
     loader = torch.utils.data.DataLoader(
         dataset=dataset,
@@ -187,7 +192,7 @@ def train(config_path, cuda):
         power=CONFIG.SOLVER.POLY_POWER,
     )
 
-    variant_name = "jointbksv2_mat_enlarge"
+    variant_name = "jointbksv2_all_gray_mat"
 
     # Setup loss logger
     writer = SummaryWriter(os.path.join(CONFIG.EXP.OUTPUT_DIR, "logs", CONFIG.EXP.ID, variant_name))
@@ -243,7 +248,7 @@ def train(config_path, cuda):
         
         # segmentation loss
         _, _, lH, lW = logits.shape
-        seg_labels = resize_labels(enlarged_labels, size=(lH, lW))
+        seg_labels = resize_labels(labels, size=(lH, lW))
         # seg_loss += criterion(logits, seg_labels.to(device))
         seg_loss_raw = F.cross_entropy(logits, seg_labels.to(device).long(), 
             ignore_index=CONFIG.SOLVER.IGNORE_LABEL,
@@ -374,6 +379,17 @@ def train(config_path, cuda):
                         )
             """
 
+        if iteration % CONFIG.VAL_ITER == 0:
+            iou, eval_result_list = evaluator.eval(model)
+            model.train()
+            model.module.freeze_bn()
+            # writer.add_scalar("val_precision", avg_precision, iteration)
+            # writer.add_scalar("val_recall", avg_recall, iteration)
+            writer.add_scalar("val_iou", iou, iteration)
+            total_fp = np.sum([item[2] for item in eval_result_list])
+            total_fn = np.sum([item[3] for item in eval_result_list])
+            writer.add_scalar("val_fp", total_fp, iteration)
+            writer.add_scalar("val_fn", total_fn, iteration)     
         
 
         # Save a model
