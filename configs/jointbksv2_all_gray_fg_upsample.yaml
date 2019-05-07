@@ -1,6 +1,7 @@
 EXP:
     ID: jointbksv2
     OUTPUT_DIR: data
+    VARIANT_NAME: upsample_fg
 
 DATASET:
     LABELS: ./data/datasets/human/labels.txt
@@ -40,7 +41,7 @@ BRIGHTNESS_RANGE: [0.5, 1.2]
 VIS_ITER: 1000
 VAL_ITER: 500
 TRAIN_ALL_GRAY: true
-UPSAMPLER_MODE: fgbg
+UPSAMPLER_MODE: fg
 
 DATALOADER:
     NUM_WORKERS: 4

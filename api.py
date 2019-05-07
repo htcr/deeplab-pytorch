@@ -10,7 +10,7 @@ from addict import Dict
 import matplotlib.pyplot as plt
 
 from .libs.models import *
-from libs.models.deeplabv2_joint_bks import DeepLabV2JointBKS, DeepLabV2JointBKSV2, DeepLabV2JointBKSV2GF
+from libs.models.deeplabv2_joint_bks import DeepLabV2JointBKS, DeepLabV2JointBKSV2, DeepLabV2JointBKSV2GF, DeepLabV2JointBKSV2Legacy
 from libs.models.deepdiff_e2e import DeepDiffE2E
 from .libs.utils import DenseCRF
 
@@ -111,7 +111,7 @@ def inference_mask(model, image, bk, raw_image=None, postprocessor=None):
     # Image -> Probability map
     logits, cascade_masks = model(image, bk)
 
-    debug_cascade(raw_image, logits, cascade_masks)
+    # debug_cascade(raw_image, logits, cascade_masks)
 
     pred_mask = cascade_masks[-1]
     
@@ -333,11 +333,14 @@ class DeepLabV2JointBKSV2Masker(object):
         )
         model_path = osp.join(
             cur_dir,
-            'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_all_gray/checkpoint_6000.pth'
+            'data/models/jointbksv2/deeplabv2_resnet101_msc/dropbg/checkpoint_11500.pth'
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/serialbg/checkpoint_5000.pth'
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_all_gray/checkpoint_6000.pth'
             # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_ablation_no_human_prior/checkpoint_4000.pth'
             # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_baseline/checkpoint_4000.pth'
             # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2/checkpoint_4000.pth' 
             # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_augall_enlarge2/checkpoint_50000.pth'  #'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2/checkpoint_4000.pth' 
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_mat/checkpoint_36000.pth' 
         )
         
         print(device_id)
@@ -360,6 +363,7 @@ class DeepLabV2JointBKSV2Masker(object):
             self.postprocessor = None
         
         self.model = DeepLabV2JointBKSV2GF(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24])
+        # self.model = DeepLabV2JointBKSV2Legacy(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24])
         state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
         self.model.load_state_dict(state_dict)
         self.model.eval()

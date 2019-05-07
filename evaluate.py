@@ -261,7 +261,7 @@ class DomeSegmentationEval(object):
         iou = float(total_tp) / (total_tp + total_fp + total_fn)
 
         torch.set_grad_enabled(True)
-        return iou, eval_result_items        
+        return iou, eval_result_items   
             
             
             

@@ -29,7 +29,7 @@ from libs.models.deeplabv2_joint_bks import DeepLabV2JointBKSV2
 #from libs.utils import DenseCRF, PolynomialLR, scores
 from libs.utils import PolynomialLR, scores
 #from libs.datasets.human_in_dome_augbg import HumanInDome
-from libs.datasets.human_in_dome import HumanInDome
+from libs.datasets.human_in_dome_dropbg import HumanInDome
 
 import torchvision
 from torchvision.utils import make_grid
@@ -136,7 +136,7 @@ def train(config_path, cuda):
     loader_iter = iter(loader)
 
     # Model setup
-    model = DeepLabV2JointBKSV2(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24], upsampler_mode=CONFIG.UPSAMPLER_MODE)
+    model = DeepLabV2JointBKSV2(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24])
     state_dict = torch.load(CONFIG.MODEL.INIT_MODEL)
     print("    Init:", CONFIG.MODEL.INIT_MODEL)
     for m in model.state_dict().keys():
