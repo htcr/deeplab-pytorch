@@ -10,11 +10,76 @@ from addict import Dict
 import matplotlib.pyplot as plt
 
 from .libs.models import *
-from libs.models.deeplabv2_joint_bks import DeepLabV2JointBKS, DeepLabV2JointBKSV2, DeepLabV2JointBKSV2GF, DeepLabV2JointBKSV2Legacy
+from libs.models.deeplabv2_joint_bks import DeepLabV2JointBKS, DeepLabV2JointBKSV2, DeepLabV2JointBKSV2GF, DeepLabV2JointBKSV2Legacy, DeepLabV2JointBKSV2GFHiRes
 from libs.models.deepdiff_e2e import DeepDiffE2E
 from .libs.utils import DenseCRF
 
-from demo import preprocessing, inference
+# from demo import preprocessing, inference
+
+
+def preprocessing(image, device, CONFIG):
+    # Resize
+    scale = CONFIG.IMAGE.SIZE.TEST / max(image.shape[:2])
+    image = cv2.resize(image, dsize=None, fx=scale, fy=scale)
+    raw_image = image.astype(np.uint8)
+
+    # Subtract mean values
+    image = image.astype(np.float32)
+    image -= np.array(
+        [
+            float(CONFIG.IMAGE.MEAN.B),
+            float(CONFIG.IMAGE.MEAN.G),
+            float(CONFIG.IMAGE.MEAN.R),
+        ]
+    )
+
+    # Convert to torch.Tensor and add "batch" axis
+    image = torch.from_numpy(image.transpose(2, 0, 1)).float().unsqueeze(0)
+    image = image.to(device)
+
+    return image, raw_image
+
+
+def preprocessing_no_scale(image, device, CONFIG):
+    # Resize
+    # scale = 1.0
+    # image = cv2.resize(image, dsize=None, fx=scale, fy=scale)
+    raw_image = image.astype(np.uint8)
+
+    # Subtract mean values
+    image = image.astype(np.float32)
+    image -= np.array(
+        [
+            float(CONFIG.IMAGE.MEAN.B),
+            float(CONFIG.IMAGE.MEAN.G),
+            float(CONFIG.IMAGE.MEAN.R),
+        ]
+    )
+
+    # Convert to torch.Tensor and add "batch" axis
+    image = torch.from_numpy(image.transpose(2, 0, 1)).float().unsqueeze(0)
+    image = image.to(device)
+
+    return image, raw_image
+
+
+def inference(model, image, raw_image=None, postprocessor=None):
+    _, _, H, W = image.shape
+
+    # Image -> Probability map
+    logits = model(image)
+    logits = F.interpolate(logits, size=(H, W), mode="bilinear", align_corners=False)
+    probs = F.softmax(logits, dim=1)[0]
+    probs = probs.cpu().numpy()
+
+    # Refine the prob map with CRF
+    if postprocessor and raw_image is not None:
+        probs = postprocessor(raw_image, probs)
+
+    labelmap = np.argmax(probs, axis=0)
+
+    return labelmap
+
 
 class DeepLabV2Masker(object):
     def __init__(self, crf=True):
@@ -308,7 +373,7 @@ def filter_segment_hilo3(alpha, thresh_hi=0.9, thresh_lo=0.3):
     centroids = output[3]
 
     id_area_pair = [(stats[idx, cv2.CC_STAT_AREA], idx) for idx in range(1, num_labels)]
-    remain_id_area_pairs = [pair for pair in id_area_pair if pair[0] > 10000]
+    remain_id_area_pairs = [pair for pair in id_area_pair if pair[0] > 1000]
     #print(id_area_pair)
     #print(remain_id_area_pairs)
 
@@ -329,13 +394,14 @@ class DeepLabV2JointBKSV2Masker(object):
         
         config_path = osp.join(
             cur_dir,
-            'configs/jointbksv2.yaml'
+            'configs/jointbksv2_all_gray.yaml'
+            # 'configs/jointbksv2_dropbg.yaml'
         )
         model_path = osp.join(
             cur_dir,
-            'data/models/jointbksv2/deeplabv2_resnet101_msc/dropbg/checkpoint_11500.pth'
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/dropbg/checkpoint_6500.pth'
             # 'data/models/jointbksv2/deeplabv2_resnet101_msc/serialbg/checkpoint_5000.pth'
-            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_all_gray/checkpoint_6000.pth'
+            'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_all_gray/checkpoint_6000.pth'
             # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_ablation_no_human_prior/checkpoint_4000.pth'
             # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_baseline/checkpoint_4000.pth'
             # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2/checkpoint_4000.pth' 
@@ -362,6 +428,7 @@ class DeepLabV2JointBKSV2Masker(object):
         else:
             self.postprocessor = None
         
+        # self.model = DeepLabV2JointBKSV2(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24])
         self.model = DeepLabV2JointBKSV2GF(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24])
         # self.model = DeepLabV2JointBKSV2Legacy(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24])
         state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
@@ -411,8 +478,107 @@ class DeepLabV2JointBKSV2Masker(object):
         """
 
         alpha = cv2.resize(alpha, (ori_w, ori_h))
+        
         # mask = np.where(alpha > 0.9, 255, 0).astype(np.uint8)
 
         mask = filter_segment_hilo3(alpha, thresh_hi=0.9, thresh_lo=0.3)
+
+        return mask
+
+
+class DeepLabV2JointBKSV2GFHiresMasker(object):
+    def __init__(self, crf=True, device_id=3, all_gray=True):
+        cur_dir = osp.dirname(osp.realpath(__file__))
+        
+        config_path = osp.join(
+            cur_dir,
+            'configs/jointbksv2_all_gray.yaml'
+            # 'configs/jointbksv2_dropbg.yaml'
+        )
+        model_path = osp.join(
+            cur_dir,
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/dropbg/checkpoint_6500.pth'
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/serialbg/checkpoint_5000.pth'
+            'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_all_gray/checkpoint_6000.pth'
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_ablation_no_human_prior/checkpoint_4000.pth'
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_baseline/checkpoint_4000.pth'
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2/checkpoint_4000.pth' 
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_augall_enlarge2/checkpoint_50000.pth'  #'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2/checkpoint_4000.pth' 
+            # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_mat/checkpoint_36000.pth' 
+        )
+        
+        print(device_id)
+        device = torch.device('cuda:{}'.format(device_id))
+        CONFIG = Dict(yaml.load(open(config_path, 'r')))
+
+        torch.set_grad_enabled(False)
+        # CRF post-processor
+        self.crf = crf
+        if crf:
+            self.postprocessor = DenseCRF(
+                iter_max=CONFIG.CRF.ITER_MAX,
+                pos_xy_std=CONFIG.CRF.POS_XY_STD,
+                pos_w=CONFIG.CRF.POS_W,
+                bi_xy_std=CONFIG.CRF.BI_XY_STD,
+                bi_rgb_std=CONFIG.CRF.BI_RGB_STD,
+                bi_w=CONFIG.CRF.BI_W,
+            )
+        else:
+            self.postprocessor = None
+        
+        # self.model = DeepLabV2JointBKSV2(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24])
+        self.model = DeepLabV2JointBKSV2GFHiRes(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24], backbone_scale=0.5)
+        # self.model = DeepLabV2JointBKSV2Legacy(n_classes=CONFIG.MODEL.N_CLASSES, n_blocks=[3, 4, 23, 3], atrous_rates=[6, 12, 18, 24])
+        state_dict = torch.load(model_path, map_location=lambda storage, loc: storage)
+        self.model.load_state_dict(state_dict)
+        self.model.eval()
+        self.model.to(device)
+
+        self.CONFIG = CONFIG
+        self.device = device
+
+        self.all_gray = all_gray
+    
+
+    def get_mask(self, image, bk):
+        if self.all_gray:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            bk = cv2.cvtColor(bk, cv2.COLOR_BGR2GRAY)
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+            bk = cv2.cvtColor(bk, cv2.COLOR_GRAY2BGR)
+
+        ori_h, ori_w = image.shape[:2]
+        image_tensor, raw_image = preprocessing_no_scale(image, self.device, self.CONFIG)
+        bk_tensor, raw_bk = preprocessing_no_scale(bk, self.device, self.CONFIG)
+        
+        """
+        bk = cv2.resize(bk, raw_image.shape[:2][::-1])
+        
+        diff = np.maximum(raw_image, bk).astype(np.float32) / (np.minimum(raw_image, bk).astype(np.float32) + 0.1)
+        
+        diff = (diff - np.min(diff)) / (np.max(diff) - np.min(diff)) * 255
+
+        diff = diff.astype(np.uint8)
+
+        raw_image = diff
+        """
+
+        #plt.imshow(raw_image)
+        #plt.show()        
+
+        labelmap, alpha = inference_mask(self.model, image_tensor, bk_tensor, raw_image, self.postprocessor)
+        
+        """
+        mask = labelmap == 1
+        mask = mask.astype(np.uint8) * 255
+        mask = cv2.resize(mask, (ori_w, ori_h))
+        mask = np.where(mask > 128, 255, 0).astype(np.uint8)
+        """
+
+        # alpha = cv2.resize(alpha, (ori_w, ori_h))
+        
+        # mask = np.where(alpha > 0.9, 255, 0).astype(np.uint8)
+
+        mask = filter_segment_hilo3(alpha, thresh_hi=0.9, thresh_lo=0.6)
 
         return mask

@@ -19,7 +19,7 @@ config_path = osp.join(
 )
 model_path = osp.join(
     cur_dir,
-    'data/models/jointbksv2/deeplabv2_resnet101_msc/dropbg/checkpoint_11500.pth'
+    'data/models/jointbksv2/deeplabv2_resnet101_msc/dropbg/checkpoint_6500.pth'
     # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_ablation_baseline_eval/checkpoint_33000.pth'
     # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_ablation_no_human_prior/checkpoint_4000.pth'
     # 'data/models/jointbksv2/deeplabv2_resnet101_msc/jointbksv2_baseline/checkpoint_4000.pth'
