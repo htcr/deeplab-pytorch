@@ -60,7 +60,8 @@ class DomeSegmentEvalDataset(Dataset):
         self.all_gray = all_gray
         self.mean_bgr = mean_bgr
 
-        val_root = '/media/mscv1/14fecf86-bdfa-4ebd-8b47-eea4ddee198e/dome_val_imgs'
+        # val_root = '/media/mscv1/14fecf86-bdfa-4ebd-8b47-eea4ddee198e/dome_val_imgs'
+        val_root = CONFIG.VAL_ROOT
         fg_folder = 'fgs'
         bg_folder = 'bgs'
         gt_folder = 'gts'

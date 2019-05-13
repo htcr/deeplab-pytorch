@@ -40,6 +40,7 @@ BG_SCALES: [0.5, 0.75, 1.0]
 BRIGHTNESS_RANGE: [0.5, 1.2]
 VIS_ITER: 1000
 VAL_ITER: 500
+VAL_ROOT: /media/mscv1/14fecf86-bdfa-4ebd-8b47-eea4ddee198e/dome_val_imgs
 TRAIN_ALL_GRAY: true
 UPSAMPLER_MODE: fgbg
 
