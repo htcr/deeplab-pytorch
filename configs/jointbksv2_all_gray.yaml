@@ -1,6 +1,7 @@
 EXP:
     ID: jointbksv2
     OUTPUT_DIR: data
+    VARIANT_NAME: all_gray
 
 DATASET:
     LABELS: ./data/datasets/human/labels.txt
